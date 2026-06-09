@@ -1,0 +1,12 @@
+# Build output
+bin/
+obj/
+
+# macOS artefacts
+__MACOSX/
+.DS_Store
+
+# User-specific files
+*.user
+.vs/
+
