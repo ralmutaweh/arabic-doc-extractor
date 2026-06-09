@@ -1,52 +1,25 @@
 ﻿using ArabicPdfReader.Services;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 
 class Program
 {
-    static async Task Main()
+    static async Task Main(string[] args)
     {
-        var services = new ServiceCollection();
-        services.AddHttpClient();
-        services.AddSingleton<HttpClientService>();
-        services.AddSingleton<LlmService>();
-        services.AddSingleton<PdfService>();
-        services.AddSingleton<DocxService>();
+        
+        var builder = WebApplication.CreateBuilder(args);
+        
+        // Register services
+        builder.Services.AddHttpClient();
+        builder.Services.AddSingleton<HttpClientService>(); // Abstraction layer for Microsoft HttpClient
+        builder.Services.AddSingleton<LlmService>();
+        builder.Services.AddSingleton<PdfService>();
+        builder.Services.AddSingleton<DocxService>();
+        
+        var app = builder.Build();   
 
-        var serviceProvider = services.BuildServiceProvider();
+        app.MapGet("/", () => "Arabic Doc Extractor API is running!");  
 
-        var llmService = serviceProvider.GetRequiredService<LlmService>();
-        var pdfService = serviceProvider.GetRequiredService<PdfService>();
-        var docxService = serviceProvider.GetRequiredService<DocxService>();
-
-        var pdfPath = Path.Combine(
-          Directory.GetCurrentDirectory(),
-          "Content",
-          "01-contact-form-simple.pdf"
-        );
-
-        var docxPath = Path.Combine(
-          Directory.GetCurrentDirectory(),
-          "Content",
-          "07-company-profile.docx"
-        );
-
-        string rawTextFromPdf = pdfService.ExtractText(pdfPath);
-
-        string rawTextFromDocx = docxService.ExtractText(docxPath);
-
-        Console.WriteLine("=== RAW TEXT FROM WORD ===");
-        Console.WriteLine(rawTextFromDocx);
-
-        Console.WriteLine("=== RAW TEXT FROM PDF ===");
-        Console.WriteLine(rawTextFromPdf);
-
-        string responsePdf = await llmService.ExtractData(rawTextFromPdf);
-        Console.WriteLine("=== LLM RESPONSE PDF ===");
-        Console.WriteLine(responsePdf);
-
-
-        string responseDocx = await llmService.ExtractData(rawTextFromDocx);
-        Console.WriteLine("=== LLM RESPONSE Docx ===");
-        Console.WriteLine(responseDocx);
-    }
+        app.Run();
+      }
 }
