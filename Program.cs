@@ -6,20 +6,20 @@ class Program
 {
     static async Task Main(string[] args)
     {
-        
         var builder = WebApplication.CreateBuilder(args);
-        
-        // Register services
+
         builder.Services.AddHttpClient();
-        builder.Services.AddSingleton<HttpClientService>(); // Abstraction layer for Microsoft HttpClient
+        builder.Services.AddSingleton<HttpClientService>();
         builder.Services.AddSingleton<LlmService>();
         builder.Services.AddSingleton<PdfService>();
         builder.Services.AddSingleton<DocxService>();
-        
-        var app = builder.Build();   
+        builder.Services.AddControllers();
 
-        app.MapGet("/", () => "Arabic Doc Extractor API is running!");  
+        var app = builder.Build();
+
+        app.MapGet("/", () => "Arabic Doc Extractor API is running!");
+        app.MapControllers();
 
         app.Run();
-      }
+    }
 }

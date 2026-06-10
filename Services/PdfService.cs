@@ -8,11 +8,11 @@ namespace ArabicPdfReader.Services
     public class PdfService
     {
 
-        public string ExtractText(string path)
+        public string ExtractText(Stream stream)
         {
             var stringBuilder = new StringBuilder();
 
-            using (PdfDocument document = PdfDocument.Open(path))
+            using (PdfDocument document = PdfDocument.Open(stream))
             {
                 foreach (Page page in document.GetPages())
                 {

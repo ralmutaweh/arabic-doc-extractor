@@ -7,11 +7,11 @@ namespace ArabicPdfReader.Services
 {
     public class DocxService
     {
-        public string ExtractText(string path)
+        public string ExtractText(Stream stream)
         {
             var stringBuilder = new StringBuilder();
 
-            using (WordprocessingDocument wordDoc = WordprocessingDocument.Open(path, false))
+            using (WordprocessingDocument wordDoc = WordprocessingDocument.Open(stream, false))
             {
                 if (wordDoc.MainDocumentPart == null) return string.Empty;
 
