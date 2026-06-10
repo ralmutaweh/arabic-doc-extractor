@@ -1,61 +1,28 @@
-using System.Text;
-using System.Text.Json;
-using System.Net.Http.Headers;
-using UglyToad.PdfPig.DocumentLayoutAnalysis.PageSegmenter;
+using Microsoft.SemanticKernel;
+
 
 namespace ArabicPdfReader.Services
 {
     public class LlmService
     {
-        private const string ApiUrl = "http://192.168.100.194:11434/api/chat";
+        private readonly Kernel kernel;
 
-        private readonly HttpClient client;
-
-        public LlmService(HttpClientService client)
+        public LlmService(Kernel kernel)
         {
-            this.client = client.GetClient();
+            this.kernel = kernel;
         }
 
         public async Task<string> ExtractData(string text)
         {
             string prompt = BuildPrompt(text);
 
-            var requestBody = new
-            {
-                model = "qwen3.5:9b",
-                messages = new[]
-                {
-                    new { role = "system", content = "You are an Arabic information extraction engine. You extract field values exactly as they appear in Arabic text. You never translate Arabic to English. You never use markdown. You return only raw JSON." },
-                    new { role = "user", content = prompt }
-                },
-                stream = false,
-                think = false,
-                options = new { temperature = 0 }
-            };
-
-            string json = JsonSerializer.Serialize(requestBody);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
             try
             {
-                // The response is the HTTP response object 
-                var response = await client.PostAsync(ApiUrl, content);
+                var response = await kernel.InvokePromptAsync(prompt);
 
-                // Result is the HTTP body as a stream, which is converted into a string
-                string result = await response.Content.ReadAsStringAsync();
-
-                if (!response.IsSuccessStatusCode)
-                    return $"Error: {response.StatusCode} - {result}";
-
-                // Parse the Ollama JSON envelope and extract the inner content string 
-                using JsonDocument parseResult = JsonDocument.Parse(result);
-                JsonElement root = parseResult.RootElement;
-
-                string parsedResult = root.GetProperty("message").GetProperty("content").GetString() ?? "Error: content was null";
-
-                return parsedResult;
+                return response.ToString();
             }
-            catch (HttpRequestException e)
+            catch (Exception e)
             {
                 return e.Message;
             }

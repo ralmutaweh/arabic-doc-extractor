@@ -1,6 +1,5 @@
 ﻿using ArabicPdfReader.Services;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.SemanticKernel;
 
 class Program
 {
@@ -8,13 +7,17 @@ class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        builder.Services.AddHttpClient();
-        builder.Services.AddSingleton<HttpClientService>();
         builder.Services.AddSingleton<LlmService>();
         builder.Services.AddSingleton<PdfService>();
         builder.Services.AddSingleton<DocxService>();
         builder.Services.AddControllers();
 
+        builder.Services.AddOllamaChatCompletion(
+          modelId: "qwen3.5:9b",
+          endpoint: new Uri("http://192.168.100.194:11434") // Where Ollama instance is listening
+        );
+
+        builder.Services.AddTransient<Kernel>(); // Opposite of singleton instance, each kernel request gets its own clean kernel instance with no shared state
         var app = builder.Build();
 
         app.MapGet("/", () => "Arabic Doc Extractor API is running!");
