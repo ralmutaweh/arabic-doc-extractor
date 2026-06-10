@@ -1,37 +1,13 @@
 using Microsoft.SemanticKernel;
 
-
 namespace ArabicPdfReader.Services
 {
     public class LlmService
     {
         private readonly Kernel kernel;
 
-        public LlmService(Kernel kernel)
-        {
-            this.kernel = kernel;
-        }
-
-        public async Task<string> ExtractData(string text)
-        {
-            string prompt = BuildPrompt(text);
-
-            try
-            {
-                var response = await kernel.InvokePromptAsync(prompt);
-
-                return response.ToString();
-            }
-            catch (Exception e)
-            {
-                return e.Message;
-            }
-        }
-
-        private static string BuildPrompt(string text)
-        {
-            return $@"
-            You are an information extraction engine.
+        private const string promptTemplate = @"
+         You are an information extraction engine.
 
             Extract the following fields from the PROVIDED text and return ONLY valid JSON.
 
@@ -69,8 +45,27 @@ namespace ArabicPdfReader.Services
             - Do not guess, infer, or complete partial values
 
             Text:
-            {text}
-            ";
+            {{ $extractedText }}
+        ";
+
+        public LlmService(Kernel kernel)
+        {
+            this.kernel = kernel;
+        }
+
+        public async Task<string> ExtractData(string extractedText)
+        {
+            try
+            {
+                var function = kernel.CreateFunctionFromPrompt(promptTemplate);
+                var response = await kernel.InvokeAsync(function, new KernelArguments { ["extractedText"] = extractedText});
+
+                return response.ToString();
+            }
+            catch (Exception e)
+            {
+                return e.Message;
+            }
         }
     }
 }
