@@ -12,9 +12,11 @@ class Program
         builder.Services.AddSingleton<DocxService>();
         builder.Services.AddControllers();
 
+        var ollamaHost = builder.Configuration["OLLAMA_HOST"] ?? "http://localhost:11434"; // fallback for local dev without Docker
+
         builder.Services.AddOllamaChatCompletion(
           modelId: "qwen3.5:9b",
-          endpoint: new Uri("http://192.168.100.194:11434") // Where Ollama instance is listening
+          endpoint: new Uri(ollamaHost) // Where Ollama instance is listening
         );
 
         builder.Services.AddTransient<Kernel>(); // Opposite of singleton instance, each kernel request gets its own clean kernel instance with no shared state

@@ -58,13 +58,21 @@ namespace ArabicPdfReader.Services
             try
             {
                 var function = kernel.CreateFunctionFromPrompt(promptTemplate);
-                var response = await kernel.InvokeAsync(function, new KernelArguments { ["extractedText"] = extractedText});
+                var response = await kernel.InvokeAsync(function, new KernelArguments { ["extractedText"] = extractedText });
 
                 return response.ToString();
             }
-            catch (Exception e)
+            catch (TaskCanceledException ex)
             {
-                return e.Message;
+                throw new TimeoutException("Ollama did not respond in time.", ex);
+            }
+            catch (HttpRequestException ex)
+            {
+                throw new InvalidOperationException("Could not reach Ollama.", ex);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException("Unexpected error during extraction.", ex);
             }
         }
     }
