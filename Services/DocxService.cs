@@ -7,6 +7,13 @@ namespace ArabicPdfReader.Services
 {
     public class DocxService
     {
+        private readonly ILogger<DocxService> logger;
+
+        public DocxService(ILogger<DocxService> logger)
+        {
+            this.logger = logger;
+        }
+
         public string ExtractText(Stream stream)
         {
             var stringBuilder = new StringBuilder();
@@ -45,10 +52,12 @@ namespace ArabicPdfReader.Services
             }
             catch (IOException ex)
             {
+                logger.LogError(ex, "Failed to read DOCX file.");
                 throw new InvalidOperationException("Failed to read DOCX file.", ex);
             }
             catch (Exception ex)
             {
+                logger.LogError(ex, "Unexpected error while processing DOCX file.");
                 throw new InvalidOperationException("Unexpected error while processing DOCX.", ex);
             }
 

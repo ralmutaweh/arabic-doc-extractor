@@ -5,6 +5,7 @@ namespace ArabicPdfReader.Services
     public class LlmService
     {
         private readonly Kernel kernel;
+        private readonly ILogger<LlmService> logger;
 
         private const string promptTemplate = @"
          You are an information extraction engine.
@@ -48,30 +49,51 @@ namespace ArabicPdfReader.Services
             {{ $extractedText }}
         ";
 
-        public LlmService(Kernel kernel)
+        public LlmService(Kernel kernel, ILogger<LlmService> logger)
         {
             this.kernel = kernel;
+            this.logger = logger;
         }
 
-        public async Task<string> ExtractData(string extractedText)
+        public async Task<string> ExtractData(byte[] fileBytes, string fileType)
         {
             try
             {
+                // Invoke the correct plugin method based on file type
+                string extractedText = fileType == "pdf"
+                    ? kernel.Plugins["DocumentPlugin"]["HandlePdf"].ToString()!
+                    : kernel.Plugins["DocumentPlugin"]["HandleDocx"].ToString()!;
+
+                // Use SK plugin to extract text from bytes
+                var pluginFunction = fileType == "pdf"
+                    ? kernel.Plugins["DocumentPlugin"]["HandlePdf"]
+                    : kernel.Plugins["DocumentPlugin"]["HandleDocx"];
+
+                var extractionResult = await kernel.InvokeAsync(pluginFunction,
+                    new KernelArguments { ["fileBytes"] = fileBytes });
+
+                extractedText = extractionResult.ToString();
+
+                // Pass extracted text to LLM prompt
                 var function = kernel.CreateFunctionFromPrompt(promptTemplate);
-                var response = await kernel.InvokeAsync(function, new KernelArguments { ["extractedText"] = extractedText });
+                var response = await kernel.InvokeAsync(function,
+                    new KernelArguments { ["extractedText"] = extractedText });
 
                 return response.ToString();
             }
             catch (TaskCanceledException ex)
             {
+                logger.LogError(ex, "Ollama request timed out. The model may be overloaded or unreachable.");
                 throw new TimeoutException("Ollama did not respond in time.", ex);
             }
             catch (HttpRequestException ex)
             {
+                logger.LogError(ex, "Failed to reach Ollama. Verify the host is running and OLLAMA_HOST is correctly configured.");
                 throw new InvalidOperationException("Could not reach Ollama.", ex);
             }
             catch (Exception ex)
             {
+                logger.LogError(ex, "Unexpected error during LLM extraction. File bytes length: {Length}.", fileBytes.Length);
                 throw new InvalidOperationException("Unexpected error during extraction.", ex);
             }
         }

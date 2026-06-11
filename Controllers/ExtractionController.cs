@@ -1,5 +1,6 @@
 using ArabicPdfReader.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Diagnostics;
 
 namespace ArabicPdfReader.Controllers
 {
@@ -17,15 +18,13 @@ namespace ArabicPdfReader.Controllers
         // Future maintainers: flip this flag and set _maxFileSizeBytes to activate.
         private readonly bool _enforceFileSizeLimit = false;
         private readonly long _maxFileSizeBytes = 20 * 1024 * 1024; // 20 MB, adjust as needed
-        private LlmService llmService;
-        private PdfService pdfService;
-        private DocxService docxService;
+        private readonly ILogger<ExtractionController> logger;
+        private readonly LlmService llmService;
 
-        public ExtractionController(LlmService llmService, PdfService pdfService, DocxService docxService)
+        public ExtractionController(LlmService llmService, ILogger<ExtractionController> logger)
         {
             this.llmService = llmService;
-            this.pdfService = pdfService;
-            this.docxService = docxService;
+            this.logger = logger;
         }
 
         [HttpPost("upload")]
@@ -34,50 +33,48 @@ namespace ArabicPdfReader.Controllers
             if (file == null) return BadRequest("File is null");
 
             if (_enforceFileSizeLimit && file.Length > _maxFileSizeBytes)
-            {
                 return StatusCode(413, "File exceeds the maximum allowed size.");
-            }
 
             using Stream stream = file.OpenReadStream();
-
             string fileType = DetectFileType(stream);
-            string result = string.Empty;
 
-            if (fileType == "pdf")
-            {
-                try
-                {
-                    result = pdfService.ExtractText(stream);
-                }
-                catch (Exception ex)
-                {
-                    return StatusCode(422, ex.Message);
-                }
-            }
-            else if (fileType == "docx")
-            {
-                try
-                {
-                    result = docxService.ExtractText(stream);
-                }
-                catch (Exception ex)
-                {
-                    return StatusCode(422, ex.Message);
-                }
-            }
-            else
-            {
-                return BadRequest("Unsupported file type");
-            }
+            if (fileType == "unknown")
+                return BadRequest("Unsupported file type. Only PDF and DOCX are accepted.");
+
+            logger.LogInformation("Extraction request received. File: {FileName}, Size: {Size} bytes, Type: {Type}",
+                file.FileName, file.Length, fileType);
+
+            // Convert uploaded file to bytes — passed to DocumentPlugin via LlmService
+            using var memoryStream = new MemoryStream();
+            await file.CopyToAsync(memoryStream);
+            byte[] fileBytes = memoryStream.ToArray();
+
+            var stopwatch = Stopwatch.StartNew();
 
             string llmResponse = string.Empty;
             try
             {
-                llmResponse = await llmService.ExtractData(result);
+                llmResponse = await llmService.ExtractData(fileBytes, fileType);
             }
-            catch (TimeoutException ex) { return StatusCode(504, ex.Message); }
-            catch (HttpRequestException ex) { return StatusCode(503, ex.Message); }
-            catch (Exception) { return StatusCode(500, "An internal error occurred."); }
+            catch (TimeoutException ex)
+            {
+                logger.LogError(ex, "Ollama timed out processing file {FileName}.", file.FileName);
+                return StatusCode(504, ex.Message);
+            }
+            catch (HttpRequestException ex)
+            {
+                logger.LogError(ex, "Could not reach Ollama while processing file {FileName}.", file.FileName);
+                return StatusCode(503, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Unexpected error processing file {FileName}.", file.FileName);
+                return StatusCode(500, "An internal error occurred.");
+            }
+
+            stopwatch.Stop();
+            logger.LogInformation("Extraction completed. File: {FileName}, Elapsed: {ElapsedMs}ms, Result: {Result}",
+                file.FileName, stopwatch.ElapsedMilliseconds, llmResponse);
 
             return Ok(llmResponse);
         }
@@ -93,17 +90,11 @@ namespace ArabicPdfReader.Controllers
             stream.ReadExactly(header, 0, 4);
 
             if (header[0] == 0x25 && header[1] == 0x50 && header[2] == 0x44 && header[3] == 0x46) // PDF ASCII
-            {
                 fileType = "pdf";
-            }
             else if (header[0] == 0x50 && header[1] == 0x4B && header[2] == 0x03 && header[3] == 0x04) // DOCX ASCII
-            {
                 fileType = "docx";
-            }
             else
-            {
                 fileType = "unknown";
-            }
 
             // Reset the stream position to the beginning
             stream.Position = 0;

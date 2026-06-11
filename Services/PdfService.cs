@@ -8,6 +8,11 @@ namespace ArabicPdfReader.Services
 {
     public class PdfService
     {
+        private readonly ILogger<PdfService> logger;
+        public PdfService(ILogger<PdfService> logger)
+        {
+            this.logger = logger;
+        }
         public string ExtractText(Stream stream)
         {
             var stringBuilder = new StringBuilder();
@@ -42,10 +47,12 @@ namespace ArabicPdfReader.Services
             }
             catch (IOException ex)
             {
-                throw new InvalidOperationException("Failed to read PDF.", ex);
+                logger.LogError(ex, "Failed to read PDF file.");
+                throw new InvalidOperationException("Failed to read PDF file.", ex);
             }
             catch (Exception ex)
             {
+                logger.LogError(ex, "Unexpected error while processing PDF.");
                 throw new InvalidOperationException("Unexpected error while processing PDF.", ex);
             }
 
