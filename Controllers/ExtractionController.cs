@@ -1,7 +1,5 @@
 using ArabicPdfReader.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Http;
-using System.Net;
 
 namespace ArabicPdfReader.Controllers
 {

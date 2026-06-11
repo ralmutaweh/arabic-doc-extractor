@@ -1,4 +1,5 @@
-﻿using ArabicPdfReader.Services;
+﻿using ArabicPdfReader.Plugins;
+using ArabicPdfReader.Services;
 using Microsoft.SemanticKernel;
 
 class Program
@@ -19,7 +20,14 @@ class Program
           endpoint: new Uri(ollamaHost) // Where Ollama instance is listening
         );
 
-        builder.Services.AddTransient<Kernel>(); // Opposite of singleton instance, each kernel request gets its own clean kernel instance with no shared state
+        builder.Services.AddTransient<Kernel>(serviceProvider => // Opposite of singleton instance, each kernel request gets its own clean kernel instance with no shared state
+        {
+            var kernel = new Kernel(serviceProvider);
+            var pdf = serviceProvider.GetRequiredService<PdfService>();
+            var docx = serviceProvider.GetRequiredService<DocxService>();
+            kernel.Plugins.AddFromObject(new DocumentPlugin(pdf, docx));
+            return kernel;
+        }); 
         var app = builder.Build();
 
         app.MapGet("/", () => "Arabic Doc Extractor API is running!");
