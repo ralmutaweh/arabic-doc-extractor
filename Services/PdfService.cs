@@ -52,7 +52,7 @@ namespace ArabicPdfReader.Services
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Unexpected error while processing PDF.");
+                logger.LogError(ex, "Unexpected error while processing PDF file.");
                 throw new InvalidOperationException("Unexpected error while processing PDF.", ex);
             }
 
