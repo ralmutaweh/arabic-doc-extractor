@@ -1,4 +1,6 @@
 using Microsoft.SemanticKernel;
+using OllamaSharp;
+using OllamaSharp.Models.Chat;
 
 namespace ArabicPdfReader.Services
 {
@@ -6,6 +8,7 @@ namespace ArabicPdfReader.Services
     {
         private readonly Kernel kernel;
         private readonly ILogger<LlmService> logger;
+        private readonly IConfiguration configuration;
 
         private const string promptTemplate = @"
          You are an information extraction engine.
@@ -49,21 +52,17 @@ namespace ArabicPdfReader.Services
             {{ $extractedText }}
         ";
 
-        public LlmService(Kernel kernel, ILogger<LlmService> logger)
+        public LlmService(Kernel kernel, ILogger<LlmService> logger, IConfiguration configuration)
         {
             this.kernel = kernel;
             this.logger = logger;
+            this.configuration = configuration;
         }
 
         public async Task<string> ExtractData(byte[] fileBytes, string fileType)
         {
             try
             {
-                // Invoke the correct plugin method based on file type
-                string extractedText = fileType == "pdf"
-                    ? kernel.Plugins["DocumentPlugin"]["HandlePdf"].ToString()!
-                    : kernel.Plugins["DocumentPlugin"]["HandleDocx"].ToString()!;
-
                 // Use SK plugin to extract text from bytes
                 var pluginFunction = fileType == "pdf"
                     ? kernel.Plugins["DocumentPlugin"]["HandlePdf"]
@@ -72,14 +71,42 @@ namespace ArabicPdfReader.Services
                 var extractionResult = await kernel.InvokeAsync(pluginFunction,
                     new KernelArguments { ["fileBytes"] = fileBytes });
 
-                extractedText = extractionResult.ToString();
+                string extractedText = extractionResult.ToString();
 
-                // Pass extracted text to LLM prompt
-                var function = kernel.CreateFunctionFromPrompt(promptTemplate);
-                var response = await kernel.InvokeAsync(function,
-                    new KernelArguments { ["extractedText"] = extractedText });
+                // Substitute the extracted text into the prompt template
+                string renderedPrompt = promptTemplate.Replace("{{ $extractedText }}", extractedText);
 
-                return response.ToString();
+                // Call Ollama directly (bypassing the SK chat-completion abstraction).
+                // For "thinking" models like Qwen3.5, Think must be explicitly set to false,
+                // otherwise the model's answer can end up in the reasoning/thinking stream
+                // rather than message.content, which the SK connector does not surface.
+                var ollamaHost = configuration["OLLAMA_HOST"] ?? "http://localhost:11434";
+                var ollamaClient = new OllamaApiClient(new Uri(ollamaHost), "qwen3.5:9b");
+
+                var chatRequest = new ChatRequest
+                {
+                    Model = "qwen3.5:9b",
+                    Messages = new[]
+                    {
+                        new Message { Role = ChatRole.User, Content = renderedPrompt }
+                    },
+                    Think = false,
+                    Stream = false,
+                    Options = new OllamaSharp.Models.RequestOptions
+                    {
+                        Temperature = 0
+                    }
+                };
+
+                string resultText = string.Empty;
+                await foreach (var chunk in ollamaClient.ChatAsync(chatRequest))
+                {
+                    if (chunk?.Message?.Content is { Length: > 0 } content)
+                        resultText += content;
+                }
+
+                return resultText;
+
             }
             catch (TaskCanceledException ex)
             {
@@ -89,7 +116,7 @@ namespace ArabicPdfReader.Services
             catch (HttpRequestException ex)
             {
                 logger.LogError(ex, "Failed to reach Ollama. Verify the host is running and OLLAMA_HOST is correctly configured.");
-                throw new InvalidOperationException("Could not reach Ollama.", ex);
+                throw;
             }
             catch (Exception ex)
             {
