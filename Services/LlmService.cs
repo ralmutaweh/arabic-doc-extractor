@@ -1,4 +1,3 @@
-using Microsoft.SemanticKernel;
 using OllamaSharp;
 using OllamaSharp.Models.Chat;
 
@@ -6,7 +5,8 @@ namespace ArabicPdfReader.Services
 {
     public class LlmService
     {
-        private readonly Kernel kernel;
+        private readonly PdfService pdfService;
+        private readonly DocxService docxService;
         private readonly ILogger<LlmService> logger;
         private readonly IConfiguration configuration;
 
@@ -52,9 +52,10 @@ namespace ArabicPdfReader.Services
             {{ $extractedText }}
         ";
 
-        public LlmService(Kernel kernel, ILogger<LlmService> logger, IConfiguration configuration)
+        public LlmService(PdfService pdfService, DocxService docxService, ILogger<LlmService> logger, IConfiguration configuration)
         {
-            this.kernel = kernel;
+            this.pdfService = pdfService;
+            this.docxService = docxService;
             this.logger = logger;
             this.configuration = configuration;
         }
@@ -63,15 +64,12 @@ namespace ArabicPdfReader.Services
         {
             try
             {
-                // Use SK plugin to extract text from bytes
-                var pluginFunction = fileType == "pdf"
-                    ? kernel.Plugins["DocumentPlugin"]["HandlePdf"]
-                    : kernel.Plugins["DocumentPlugin"]["HandleDocx"];
+                using var memoryStream = new MemoryStream(fileBytes);
+                
+                string extractedText = fileType == "pdf" ?
+                    pdfService.ExtractText(memoryStream) :
+                    docxService.ExtractText(memoryStream);
 
-                var extractionResult = await kernel.InvokeAsync(pluginFunction,
-                    new KernelArguments { ["fileBytes"] = fileBytes });
-
-                string extractedText = extractionResult.ToString();
 
                 // Substitute the extracted text into the prompt template
                 string renderedPrompt = promptTemplate.Replace("{{ $extractedText }}", extractedText);
