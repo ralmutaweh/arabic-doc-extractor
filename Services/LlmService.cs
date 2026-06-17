@@ -5,33 +5,22 @@ namespace ArabicPdfReader.Services
 {
     public class LlmService
     {
-        private readonly PdfService pdfService;
-        private readonly DocxService docxService;
         private readonly ILogger<LlmService> logger;
         private readonly IConfiguration configuration;
         private readonly string promptTemplate;
 
-        public LlmService(PdfService pdfService, DocxService docxService, ILogger<LlmService> logger, IConfiguration configuration)
+        public LlmService(ILogger<LlmService> logger, IConfiguration configuration)
         {
-            this.pdfService = pdfService;
-            this.docxService = docxService;
             this.logger = logger;
             this.configuration = configuration;
 
             promptTemplate = File.ReadAllText("Prompts/extraction_prompt.txt", System.Text.Encoding.UTF8);
         }
 
-        public async Task<string> ExtractData(byte[] fileBytes, string fileType, string model)
+        public async Task<string> ExtractData(string extractedText, string fileType, long fileSize, string model)
         {
             try
             {
-                using var memoryStream = new MemoryStream(fileBytes);
-                
-                string extractedText = fileType == "pdf" ?
-                    pdfService.ExtractText(memoryStream) :
-                    docxService.ExtractText(memoryStream);
-
-
                 string renderedPrompt = promptTemplate.Replace("{{extractedText}}", extractedText);
 
                 var ollamaHost = configuration["OLLAMA_HOST"] ?? "http://localhost:11434";
@@ -73,8 +62,8 @@ namespace ArabicPdfReader.Services
                     ",",
                     DateTime.UtcNow.ToString("o"), // ISO 8601 foramt
                     fileType,
-                    fileBytes.Length,
-                    "qwen3.5:9b",
+                    fileSize,
+                    model,
                     lastChunk?.PromptEvalCount,
                     lastChunk?.EvalCount,
                     lastChunk?.TotalDuration / 1_000_000,
@@ -104,7 +93,7 @@ namespace ArabicPdfReader.Services
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Unexpected error during LLM extraction. File bytes length: {Length}.", fileBytes.Length);
+                logger.LogError(ex, "Unexpected error during LLM extraction. File bytes length: {Length}.", fileSize);
                 throw new InvalidOperationException("Unexpected error during extraction.", ex);
             }
         }

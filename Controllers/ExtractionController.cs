@@ -20,11 +20,17 @@ namespace ArabicPdfReader.Controllers
         private readonly long _maxFileSizeBytes = 20 * 1024 * 1024; // 20 MB, adjust as needed
         private readonly ILogger<ExtractionController> logger;
         private readonly LlmService llmService;
+        private readonly GlinerService glinerService;
+        private readonly PdfService pdfService;
+        private readonly DocxService docxService;
         private string? modelUsed; // This var is kept for testing purposes. It eases the switch of models in testing phase.
 
-        public ExtractionController(LlmService llmService, ILogger<ExtractionController> logger)
+        public ExtractionController(LlmService llmService, GlinerService glinerService, PdfService pdfService, DocxService docxService, ILogger<ExtractionController> logger)
         {
             this.llmService = llmService;
+            this.glinerService = glinerService;
+            this.pdfService = pdfService;
+            this.docxService = docxService;
             this.logger = logger;
         }
 
@@ -50,12 +56,18 @@ namespace ArabicPdfReader.Controllers
             await file.CopyToAsync(memoryStream);
             byte[] fileBytes = memoryStream.ToArray();
 
+            string extractedText = ExtractText(fileBytes, fileType);
             var stopwatch = Stopwatch.StartNew();
 
-            string llmResponse = string.Empty;
+            string modelResponse = string.Empty;
             try
             {
-                llmResponse = await llmService.ExtractData(fileBytes, fileType, model);
+                if (model == "gliner")
+                {
+                       modelResponse = await glinerService.ExtractData(extractedText, fileType, fileBytes.Length);
+                } else {
+                modelResponse = await llmService.ExtractData(extractedText, fileType, fileBytes.Length, model);
+                }
             }
             catch (TimeoutException ex)
             {
@@ -75,9 +87,9 @@ namespace ArabicPdfReader.Controllers
 
             stopwatch.Stop();
             logger.LogInformation("Extraction completed. File: {FileName}, Elapsed: {ElapsedMs}ms, Result: {Result}",
-                file.FileName, stopwatch.ElapsedMilliseconds, llmResponse);
+                file.FileName, stopwatch.ElapsedMilliseconds, modelResponse);
 
-            return Ok(llmResponse);
+            return Ok(modelResponse);
         }
 
         // Rather than trusting file.ContentType, which is client-supplied and can be spoofed,
@@ -101,6 +113,14 @@ namespace ArabicPdfReader.Controllers
             stream.Position = 0;
 
             return fileType;
+        }
+
+        private string ExtractText(byte[] fileBytes, string fileType)
+        {
+            using var memoryStream = new MemoryStream(fileBytes);
+            return fileType == "pdf" ?
+            pdfService.ExtractText(memoryStream) :
+            docxService.ExtractText(memoryStream);
         }
     }
 }

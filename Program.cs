@@ -9,6 +9,7 @@ class Program
         var builder = WebApplication.CreateBuilder(args);
 
         builder.Services.AddSingleton<LlmService>();
+        builder.Services.AddSingleton<GlinerService>();
         builder.Services.AddSingleton<PdfService>();
         builder.Services.AddSingleton<DocxService>();
         builder.Services.AddControllers();
