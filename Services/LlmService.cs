@@ -21,7 +21,7 @@ namespace ArabicPdfReader.Services
             promptTemplate = File.ReadAllText("Prompts/extraction_prompt.txt", System.Text.Encoding.UTF8);
         }
 
-        public async Task<string> ExtractData(byte[] fileBytes, string fileType)
+        public async Task<string> ExtractData(byte[] fileBytes, string fileType, string model)
         {
             try
             {
@@ -35,7 +35,7 @@ namespace ArabicPdfReader.Services
                 string renderedPrompt = promptTemplate.Replace("{{extractedText}}", extractedText);
 
                 var ollamaHost = configuration["OLLAMA_HOST"] ?? "http://localhost:11434";
-                var ollamaClient = new OllamaApiClient(new Uri(ollamaHost), "qwen3.5:9b");
+                var ollamaClient = new OllamaApiClient(new Uri(ollamaHost), model);
 
                 var chatRequest = new ChatRequest
                 {

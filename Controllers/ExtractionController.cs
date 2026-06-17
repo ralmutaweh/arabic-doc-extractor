@@ -20,6 +20,7 @@ namespace ArabicPdfReader.Controllers
         private readonly long _maxFileSizeBytes = 20 * 1024 * 1024; // 20 MB, adjust as needed
         private readonly ILogger<ExtractionController> logger;
         private readonly LlmService llmService;
+        private string? modelUsed; // This var is kept for testing purposes. It eases the switch of models in testing phase.
 
         public ExtractionController(LlmService llmService, ILogger<ExtractionController> logger)
         {
@@ -28,7 +29,7 @@ namespace ArabicPdfReader.Controllers
         }
 
         [HttpPost("upload")]
-        public async Task<IActionResult> Upload(IFormFile file)
+        public async Task<IActionResult> Upload(IFormFile file, string model = "qwen3.5:9b")
         {
             if (file == null) return BadRequest("File is null");
 
@@ -54,7 +55,7 @@ namespace ArabicPdfReader.Controllers
             string llmResponse = string.Empty;
             try
             {
-                llmResponse = await llmService.ExtractData(fileBytes, fileType);
+                llmResponse = await llmService.ExtractData(fileBytes, fileType, model);
             }
             catch (TimeoutException ex)
             {
