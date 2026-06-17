@@ -1,6 +1,7 @@
 ﻿using ArabicPdfReader.Middleware;
 using ArabicPdfReader.Services;
 
+
 class Program
 {
     static async Task Main(string[] args)

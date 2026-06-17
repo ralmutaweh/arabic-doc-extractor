@@ -9,48 +9,7 @@ namespace ArabicPdfReader.Services
         private readonly DocxService docxService;
         private readonly ILogger<LlmService> logger;
         private readonly IConfiguration configuration;
-
-        private const string promptTemplate = @"
-         You are an information extraction engine.
-
-            Extract the following fields from the PROVIDED text and return ONLY valid JSON.
-
-            Fields:
-            - Full Name
-            - Location
-            - Phone Number
-            - Fax Number
-            - Email Address
-            - Company Name
-            - CR Number
-            - Address
-            - Role / Title
-            - Organisation
-            - Source / Informant
-            - Date
-
-            Rules:
-            - Return ONLY JSON
-            - No explanation
-            - No markdown
-            - No extra information
-            - If a field is missing, return null
-            - Extract text exactly as it appears in the document, in Arabic
-            - Do not transliterate Arabic to English
-            - Do not romanize Arabic names or words
-            - Return ONLY raw JSON, no markdown, no code blocks, no backticks
-            - Full Name is the person's complete Arabic name
-            - Phone and Fax are separate fields, do not combine them
-            - The field labels in the document are in Arabic — extract the VALUE after the colon, not the label itself
-            - You MUST NOT use backticks or code blocks under any circumstances
-            - NEVER translate any Arabic text to English, return it exactly as extracted
-            - Copy the Arabic value character by character, do not modify, translate, or guess
-            - If you are not 100% certain a value exists in the text, return null
-            - Do not guess, infer, or complete partial values
-
-            Text:
-            {{ $extractedText }}
-        ";
+        private readonly string promptTemplate;
 
         public LlmService(PdfService pdfService, DocxService docxService, ILogger<LlmService> logger, IConfiguration configuration)
         {
@@ -58,6 +17,8 @@ namespace ArabicPdfReader.Services
             this.docxService = docxService;
             this.logger = logger;
             this.configuration = configuration;
+
+            promptTemplate = File.ReadAllText("Prompts/extraction_prompt.txt", System.Text.Encoding.UTF8);
         }
 
         public async Task<string> ExtractData(byte[] fileBytes, string fileType)
@@ -71,38 +32,63 @@ namespace ArabicPdfReader.Services
                     docxService.ExtractText(memoryStream);
 
 
-                // Substitute the extracted text into the prompt template
-                string renderedPrompt = promptTemplate.Replace("{{ $extractedText }}", extractedText);
+                string renderedPrompt = promptTemplate.Replace("{{extractedText}}", extractedText);
 
-                // Call Ollama directly (bypassing the SK chat-completion abstraction).
-                // For "thinking" models like Qwen3.5, Think must be explicitly set to false,
-                // otherwise the model's answer can end up in the reasoning/thinking stream
-                // rather than message.content, which the SK connector does not surface.
                 var ollamaHost = configuration["OLLAMA_HOST"] ?? "http://localhost:11434";
                 var ollamaClient = new OllamaApiClient(new Uri(ollamaHost), "qwen3.5:9b");
 
                 var chatRequest = new ChatRequest
                 {
-                    Model = "qwen3.5:9b",
                     Messages = new[]
                     {
-                        new Message { Role = ChatRole.User, Content = renderedPrompt }
+                        new Message { 
+                            Role = ChatRole.System, 
+                            Content = "You are a structured data extraction engine for Arabic documents. Return only raw JSON."  
+                        },
+                        new Message
+                        {
+                            Role = ChatRole.User,
+                            Content = renderedPrompt
+                        }
                     },
                     Think = false,
                     Stream = false,
-                    Options = new OllamaSharp.Models.RequestOptions
-                    {
-                        Temperature = 0
-                    }
+                    Options = new OllamaSharp.Models.RequestOptions { Temperature = 0 }
                 };
 
+
                 string resultText = string.Empty;
+                ChatDoneResponseStream? lastChunk = null;
+
                 await foreach (var chunk in ollamaClient.ChatAsync(chatRequest))
                 {
                     if (chunk?.Message?.Content is { Length: > 0 } content)
                         resultText += content;
+                    
+                    if (chunk is ChatDoneResponseStream done) 
+                        lastChunk = done;
                 }
 
+                var csvLine = string.Join(
+                    ",",
+                    DateTime.UtcNow.ToString("o"), // ISO 8601 foramt
+                    fileType,
+                    fileBytes.Length,
+                    "qwen3.5:9b",
+                    lastChunk?.PromptEvalCount,
+                    lastChunk?.EvalCount,
+                    lastChunk?.TotalDuration / 1_000_000,
+                    lastChunk?.EvalDuration / 1_000_000,
+                    lastChunk?.DoneReason
+                );
+
+                var csvPath = "/app/logs/extraction_log.csv";
+                Directory.CreateDirectory(Path.GetDirectoryName(csvPath)!);
+
+                if (!File.Exists(csvPath))
+                     await File.AppendAllTextAsync(csvPath, "timestamp,file_type,file_size_bytes,model,prompt_tokens,completion_tokens,total_duration_ms,eval_duration_ms,done_reason\n");
+
+                await File.AppendAllTextAsync(csvPath, csvLine + "\n");
                 return resultText;
 
             }
