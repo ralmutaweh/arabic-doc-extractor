@@ -17,7 +17,7 @@ namespace ArabicPdfReader.Services
             promptTemplate = File.ReadAllText("Prompts/extraction_prompt.txt", System.Text.Encoding.UTF8);
         }
 
-        public async Task<string> ExtractData(string extractedText, string fileType, long fileSize, string model)
+        public async Task<string> ExtractData(string extractedText, string fileType, long fileSize, string fileName, string model)
         {
             try
             {
@@ -61,6 +61,7 @@ namespace ArabicPdfReader.Services
                 var csvLine = string.Join(
                     ",",
                     DateTime.UtcNow.ToString("o"), // ISO 8601 foramt
+                    fileName,
                     fileType,
                     fileSize,
                     model,
@@ -75,7 +76,7 @@ namespace ArabicPdfReader.Services
                 Directory.CreateDirectory(Path.GetDirectoryName(csvPath)!);
 
                 if (!File.Exists(csvPath))
-                     await File.AppendAllTextAsync(csvPath, "timestamp,file_type,file_size_bytes,model,prompt_tokens,completion_tokens,total_duration_ms,eval_duration_ms,done_reason\n");
+                     await File.AppendAllTextAsync(csvPath, "timestamp,file_name,file_type,file_size_bytes,model,prompt_tokens,completion_tokens,total_duration_ms,eval_duration_ms,done_reason\n");
 
                 await File.AppendAllTextAsync(csvPath, csvLine + "\n");
                 return resultText;

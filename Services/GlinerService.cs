@@ -16,7 +16,7 @@ namespace ArabicPdfReader.Services
             this.httpClient = new HttpClient();
         }
 
-        public async Task<string> ExtractData(string extractedText, string fileType, long fileSize)
+        public async Task<string> ExtractData(string extractedText, string fileType, long fileSize, string fileName)
         {
             try
             {
@@ -39,6 +39,7 @@ namespace ArabicPdfReader.Services
                 var csvLine = string.Join(
                     ",",
                     DateTime.UtcNow.ToString("o"),
+                    fileName,
                     fileType,
                     fileSize,
                     "gliner",
@@ -53,7 +54,7 @@ namespace ArabicPdfReader.Services
                 Directory.CreateDirectory(Path.GetDirectoryName(csvPath)!);
 
                 if (!File.Exists(csvPath))
-                    await File.AppendAllTextAsync(csvPath, "timestamp,file_type,file_size_bytes,model,prompt_tokens,completion_tokens,total_duration_ms,eval_duration_ms,done_reason\n");
+                    await File.AppendAllTextAsync(csvPath, "timestamp,file_name,file_type,file_size_bytes,model,prompt_tokens,completion_tokens,total_duration_ms,eval_duration_ms,done_reason\n");
 
                 await File.AppendAllTextAsync(csvPath, csvLine + "\n");
 

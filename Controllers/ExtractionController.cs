@@ -64,9 +64,9 @@ namespace ArabicPdfReader.Controllers
             {
                 if (model == "gliner")
                 {
-                       modelResponse = await glinerService.ExtractData(extractedText, fileType, fileBytes.Length);
+                       modelResponse = await glinerService.ExtractData(extractedText, fileType, fileBytes.Length, file.FileName);
                 } else {
-                modelResponse = await llmService.ExtractData(extractedText, fileType, fileBytes.Length, model);
+                modelResponse = await llmService.ExtractData(extractedText, fileType, fileBytes.Length, file.FileName, model);
                 }
             }
             catch (TimeoutException ex)
