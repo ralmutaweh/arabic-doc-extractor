@@ -1,109 +1,102 @@
-using System.Text;
-using System.Text.Json;
-using System.Net.Http.Headers;
-using UglyToad.PdfPig.DocumentLayoutAnalysis.PageSegmenter;
+using OllamaSharp;
+using OllamaSharp.Models.Chat;
 
 namespace ArabicPdfReader.Services
 {
     public class LlmService
     {
-        private const string ApiUrl = "http://192.168.100.194:11434/api/chat";
+        private readonly ILogger<LlmService> logger;
+        private readonly IConfiguration configuration;
+        private readonly string promptTemplate;
 
-        private readonly HttpClient client;
-
-        public LlmService(HttpClientService client)
+        public LlmService(ILogger<LlmService> logger, IConfiguration configuration)
         {
-            this.client = client.GetClient();
+            this.logger = logger;
+            this.configuration = configuration;
+
+            promptTemplate = File.ReadAllText("Prompts/extraction_prompt.txt", System.Text.Encoding.UTF8);
         }
 
-        public async Task<string> ExtractData(string text)
+        public async Task<string> ExtractData(string extractedText, string fileType, long fileSize, string fileName, string model)
         {
-            string prompt = BuildPrompt(text);
-
-            var requestBody = new
-            {
-                model = "qwen3.5:9b",
-                messages = new[]
-                {
-                    new { role = "system", content = "You are an Arabic information extraction engine. You extract field values exactly as they appear in Arabic text. You never translate Arabic to English. You never use markdown. You return only raw JSON." },
-                    new { role = "user", content = prompt }
-                },
-                stream = false,
-                think = false,
-                options = new { temperature = 0 }
-            };
-
-            string json = JsonSerializer.Serialize(requestBody);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
             try
             {
-                // The response is the HTTP response object 
-                var response = await client.PostAsync(ApiUrl, content);
+                string renderedPrompt = promptTemplate.Replace("{{extractedText}}", extractedText);
 
-                // Result is the HTTP body as a stream, which is converted into a string
-                string result = await response.Content.ReadAsStringAsync();
+                var ollamaHost = configuration["OLLAMA_HOST"] ?? "http://localhost:11434";
+                var ollamaClient = new OllamaApiClient(new Uri(ollamaHost), model);
 
-                if (!response.IsSuccessStatusCode)
-                    return $"Error: {response.StatusCode} - {result}";
+                var chatRequest = new ChatRequest
+                {
+                    Messages = new[]
+                    {
+                        new Message { 
+                            Role = ChatRole.System, 
+                            Content = "You are a structured data extraction engine for Arabic documents. Return only raw JSON."  
+                        },
+                        new Message
+                        {
+                            Role = ChatRole.User,
+                            Content = renderedPrompt
+                        }
+                    },
+                    Think = false,
+                    Stream = false,
+                    Options = new OllamaSharp.Models.RequestOptions { Temperature = 0 }
+                };
 
-                // Parse the Ollama JSON envelope and extract the inner content string 
-                using JsonDocument parseResult = JsonDocument.Parse(result);
-                JsonElement root = parseResult.RootElement;
 
-                string parsedResult = root.GetProperty("message").GetProperty("content").GetString() ?? "Error: content was null";
+                string resultText = string.Empty;
+                ChatDoneResponseStream? lastChunk = null;
 
-                return parsedResult;
+                await foreach (var chunk in ollamaClient.ChatAsync(chatRequest))
+                {
+                    if (chunk?.Message?.Content is { Length: > 0 } content)
+                        resultText += content;
+                    
+                    if (chunk is ChatDoneResponseStream done) 
+                        lastChunk = done;
+                }
+
+                var csvLine = string.Join(
+                    ",",
+                    DateTime.UtcNow.ToString("o"), // ISO 8601 foramt
+                    fileName,
+                    fileType,
+                    fileSize,
+                    model,
+                    lastChunk?.PromptEvalCount,
+                    lastChunk?.EvalCount,
+                    lastChunk?.TotalDuration / 1_000_000,
+                    lastChunk?.EvalDuration / 1_000_000,
+                    lastChunk?.DoneReason
+                );
+
+                var csvPath = "/app/logs/extraction_log.csv";
+                Directory.CreateDirectory(Path.GetDirectoryName(csvPath)!);
+
+                if (!File.Exists(csvPath))
+                     await File.AppendAllTextAsync(csvPath, "timestamp,file_name,file_type,file_size_bytes,model,prompt_tokens,completion_tokens,total_duration_ms,eval_duration_ms,done_reason\n");
+
+                await File.AppendAllTextAsync(csvPath, csvLine + "\n");
+                return resultText;
+
             }
-            catch (HttpRequestException e)
+            catch (TaskCanceledException ex)
             {
-                return e.Message;
+                logger.LogError(ex, "Ollama request timed out. The model may be overloaded or unreachable.");
+                throw new TimeoutException("Ollama did not respond in time.", ex);
             }
-        }
-
-        private static string BuildPrompt(string text)
-        {
-            return $@"
-            You are an information extraction engine.
-
-            Extract the following fields from the PROVIDED text and return ONLY valid JSON.
-
-            Fields:
-            - Full Name
-            - Location
-            - Phone Number
-            - Fax Number
-            - Email Address
-            - Company Name
-            - CR Number
-            - Address
-            - Role / Title
-            - Organisation
-            - Source / Informant
-            - Date
-
-            Rules:
-            - Return ONLY JSON
-            - No explanation
-            - No markdown
-            - No extra information
-            - If a field is missing, return null
-            - Extract text exactly as it appears in the document, in Arabic
-            - Do not transliterate Arabic to English
-            - Do not romanize Arabic names or words
-            - Return ONLY raw JSON, no markdown, no code blocks, no backticks
-            - Full Name is the person's complete Arabic name
-            - Phone and Fax are separate fields, do not combine them
-            - The field labels in the document are in Arabic — extract the VALUE after the colon, not the label itself
-            - You MUST NOT use backticks or code blocks under any circumstances
-            - NEVER translate any Arabic text to English, return it exactly as extracted
-            - Copy the Arabic value character by character, do not modify, translate, or guess
-            - If you are not 100% certain a value exists in the text, return null
-            - Do not guess, infer, or complete partial values
-
-            Text:
-            {text}
-            ";
+            catch (HttpRequestException ex)
+            {
+                logger.LogError(ex, "Failed to reach Ollama. Verify the host is running and OLLAMA_HOST is correctly configured.");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Unexpected error during LLM extraction. File bytes length: {Length}.", fileSize);
+                throw new InvalidOperationException("Unexpected error during extraction.", ex);
+            }
         }
     }
 }

@@ -1,0 +1,21 @@
+services:
+  arabic-doc-extractor:        # service name used internally by docker-compose
+    container_name: arabic-doc-extractor-service
+    build: .                   # build image from Dockerfile in current directory
+    ports:
+      - "11467:8080"           # host:container — external port 11467 maps to internal ASP.NET Core port 8080
+    environment:
+      - OLLAMA_HOST=http://192.168.100.194:11434  # Ollama instance address, change this if host changes
+      - GLINER_HOST=http://gliner-service:8001
+    restart: unless-stopped    # restart container automatically if it crashes
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      - gliner-service # Ensures GLiNER starts before .NET app
+
+  gliner-service:
+    container_name: gliner-service
+    build: ./GlinerService
+    ports: 
+      - "8001:8001"
+    restart: unless-stopped

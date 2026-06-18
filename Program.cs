@@ -1,6 +1,6 @@
-﻿using ArabicPdfReader.Services;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
+﻿using ArabicPdfReader.Middleware;
+using ArabicPdfReader.Services;
+
 
 class Program
 {
@@ -8,15 +8,15 @@ class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        builder.Services.AddHttpClient();
-        builder.Services.AddSingleton<HttpClientService>();
         builder.Services.AddSingleton<LlmService>();
+        builder.Services.AddSingleton<GlinerService>();
         builder.Services.AddSingleton<PdfService>();
         builder.Services.AddSingleton<DocxService>();
         builder.Services.AddControllers();
 
         var app = builder.Build();
 
+        app.UseMiddleware<RequestLoggingMiddleware>();
         app.MapGet("/", () => "Arabic Doc Extractor API is running!");
         app.MapControllers();
 
