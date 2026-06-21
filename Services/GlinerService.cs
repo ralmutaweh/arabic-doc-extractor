@@ -50,7 +50,7 @@ namespace ArabicPdfReader.Services
                     "stop"
                 );
 
-                var csvPath = "/app/logs/extraction_log.csv";
+                var csvPath = configuration["CsvLogPath"] ?? "../logs/extraction_log.csv";
                 Directory.CreateDirectory(Path.GetDirectoryName(csvPath)!);
 
                 if (!File.Exists(csvPath))

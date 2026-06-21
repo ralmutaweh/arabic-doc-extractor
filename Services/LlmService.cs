@@ -45,7 +45,6 @@ namespace ArabicPdfReader.Services
                     Options = new OllamaSharp.Models.RequestOptions { Temperature = 0 }
                 };
 
-
                 string resultText = string.Empty;
                 ChatDoneResponseStream? lastChunk = null;
 
@@ -72,7 +71,7 @@ namespace ArabicPdfReader.Services
                     lastChunk?.DoneReason
                 );
 
-                var csvPath = "/app/logs/extraction_log.csv";
+                var csvPath = configuration["CsvLogPath"] ?? "../logs/extraction_log.csv";
                 Directory.CreateDirectory(Path.GetDirectoryName(csvPath)!);
 
                 if (!File.Exists(csvPath))

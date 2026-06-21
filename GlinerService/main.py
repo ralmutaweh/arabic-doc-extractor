@@ -12,30 +12,31 @@ class ExtractionRequest(BaseModel): # BaseModel is a data schema to define the s
 # Endpoint
 @app.post("/extract")
 async def extract(request: ExtractionRequest):
+    
     labels = [
-        "full_name",
-        "gender",
-        "age",
-        "nationality",
-        "national_id_number",
-        "date_of_birth",
-        "phone_number",
-        "fax_number",
-        "email_address",
-        "location",
-        "address",
-        "company_name",
-        "cr_number",
-        "organisation",
-        "department",
-        "role_title",
-        "document_issue_date",
-        "source_informant",
-        "driving_license_number",
-        "car_plate_number",
-        "time_of_incident",
-        "date_of_incident"
-    ]
+    "اسم الشخص",
+    "الجنس",
+    "العمر",
+    "جنسية الشخص",
+    "الرقم الشخصي",
+    "تاريخ الميلاد",
+    "رقم هاتف الشخص للتواصل",
+    "رقم الفاكس",
+    "عنوان البريد الإلكتروني",
+    "الموقع",
+    "العنوان",
+    "اسم الشركة",
+    "السجل التجاري",
+    "المنظمة",
+    "القسم",
+    "المسمى الوظيفي",
+    "تاريخ الإصدار",
+    "المصدر",
+    "رقم رخصة القيادة",
+    "رقم اللوحة",
+    "وقت الحادث",
+    "تاريخ الحادث"
+]
 
     entities = model.predict_entities(request.text, labels)
 

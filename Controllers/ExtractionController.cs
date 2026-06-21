@@ -6,24 +6,15 @@ namespace ArabicPdfReader.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-
-    // http://localhost:5000 — default ASP.NET Core local URL
-    // then "api" keyword is added from the route attribute
-    // then "extraction" keyword is added from the class name. "Controller" is dropped
-    // "upload" comes from the HttpPost("upload")
-    // Finally the Api Url is: http://localhost:5000/api/extraction/upload
     public class ExtractionController : ControllerBase
     {
-        // Set to true to enforce the file size limit defined below.
-        // Future maintainers: flip this flag and set _maxFileSizeBytes to activate.
         private readonly bool _enforceFileSizeLimit = false;
-        private readonly long _maxFileSizeBytes = 20 * 1024 * 1024; // 20 MB, adjust as needed
+        private readonly long _maxFileSizeBytes = 20 * 1024 * 1024; // 20 MB
         private readonly ILogger<ExtractionController> logger;
         private readonly LlmService llmService;
         private readonly GlinerService glinerService;
         private readonly PdfService pdfService;
         private readonly DocxService docxService;
-        private string? modelUsed; // This var is kept for testing purposes. It eases the switch of models in testing phase.
 
         public ExtractionController(LlmService llmService, GlinerService glinerService, PdfService pdfService, DocxService docxService, ILogger<ExtractionController> logger)
         {
@@ -51,12 +42,14 @@ namespace ArabicPdfReader.Controllers
             logger.LogInformation("Extraction request received. File: {FileName}, Size: {Size} bytes, Type: {Type}",
                 file.FileName, file.Length, fileType);
 
-            // Convert uploaded file to bytes — passed to DocumentPlugin via LlmService
             using var memoryStream = new MemoryStream();
             await file.CopyToAsync(memoryStream);
             byte[] fileBytes = memoryStream.ToArray();
 
             string extractedText = ExtractText(fileBytes, fileType);
+            
+            logger.LogInformation("Extracted text for {FileName}:\n{ExtractedText}", file.FileName, extractedText);
+            
             var stopwatch = Stopwatch.StartNew();
 
             string modelResponse = string.Empty;
@@ -64,9 +57,10 @@ namespace ArabicPdfReader.Controllers
             {
                 if (model == "gliner")
                 {
-                       modelResponse = await glinerService.ExtractData(extractedText, fileType, fileBytes.Length, file.FileName);
+                    Console.WriteLine(extractedText);
+                    modelResponse = await glinerService.ExtractData(extractedText, fileType, fileBytes.Length, file.FileName);
                 } else {
-                modelResponse = await llmService.ExtractData(extractedText, fileType, fileBytes.Length, file.FileName, model);
+                    modelResponse = await llmService.ExtractData(extractedText, fileType, fileBytes.Length, file.FileName, model);
                 }
             }
             catch (TimeoutException ex)
@@ -92,10 +86,6 @@ namespace ArabicPdfReader.Controllers
             return Ok(modelResponse);
         }
 
-        // Rather than trusting file.ContentType, which is client-supplied and can be spoofed,
-        // raw magic bytes are inspected from the stream directly. This prevents a malicious actor
-        // from disguising a harmful file (e.g. an .exe) as a valid PDF or DOCX.
-        // Kept in place even though this service runs in a closed local environment for good security practice regardless.
         private string DetectFileType(Stream stream)
         {
             string fileType = string.Empty;
@@ -109,7 +99,6 @@ namespace ArabicPdfReader.Controllers
             else
                 fileType = "unknown";
 
-            // Reset the stream position to the beginning
             stream.Position = 0;
 
             return fileType;

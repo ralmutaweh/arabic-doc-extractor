@@ -1,5 +1,4 @@
 using System.Text;
-using BidiReshapeSharp;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 
@@ -28,25 +27,48 @@ namespace ArabicPdfReader.Services
 
                     if (body == null) return string.Empty;
 
-                    foreach (Paragraph paragraph in body.Elements<Paragraph>())
+                    foreach (var element in body.Elements())
                     {
-                        string text = paragraph.InnerText;
-
-                        var lines = text.Split('\n');
-                        var processedLines = lines.Select(line =>
+                        if (element is Paragraph paragraph)
                         {
-                            try
-                            {
-                                return BidiReshape.ProcessString(line);
-                            }
-                            catch
-                            {
-                                return line;
-                            }
-                        });
+                            string text = paragraph.InnerText;
 
-                        text = string.Join('\n', processedLines);
-                        stringBuilder.AppendLine(text);
+                            // DOCX stores Arabic in correct logical order already —
+                            // no BidiReshape needed. NFKC kept as a safety net for
+                            // any stray presentation-form characters.
+                            text = text.Normalize(NormalizationForm.FormKC);
+
+                            stringBuilder.AppendLine(text);
+                        }
+
+                        if (element is Table table)
+                        {
+                            var rows = table.Elements<TableRow>().ToList();
+                            if (rows.Count == 0) continue;
+
+                            // The first row will contain the column headers
+                            var headerCells = rows[0].Elements<TableCell>()
+                                .Select(cell => cell.InnerText.Normalize(NormalizationForm.FormKC))
+                                .ToList();
+
+                            // Each cell, in the remaining rows, will pair with its column header as "header: value"
+                            foreach (var row in rows.Skip(1))
+                            {
+                                var cells = row.Elements<TableCell>().ToList();
+
+                                var lines = cells.Select((cell, index) =>
+                                {
+                                    string text = cell.InnerText.Normalize(NormalizationForm.FormKC);
+                                    string header = headerCells[index];
+
+                                    return $"{header}: {text}";
+                                });
+
+                                // One key: value pair per line — mirrors the format that worked in manual GLiNER testing.
+                                stringBuilder.AppendLine(string.Join('\n', lines));
+                                stringBuilder.AppendLine(); // blank line between rows/records
+                            }
+                        }
                     }
                 }
             }
