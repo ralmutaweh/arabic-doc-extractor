@@ -22,3 +22,9 @@ timestamp,file_type,file_size_bytes,model,prompt_tokens,completion_tokens,total_
 2026-06-21T14:19:02.2207929Z,story_test.docx,docx,9335,qwen3.5:9b,3484,164,4067,3315,stop
 2026-06-21T14:25:15.4421680Z,story_test.docx,docx,9335,qwen3.5:9b,3484,164,11988,3294,stop
 2026-06-21T14:28:25.7432172Z,story_test.docx,docx,9335,qwen3.5:9b,3271,325,7558,6610,stop
+2026-06-21T14:30:17.0063855Z,story_test.docx,docx,9335,gliner,,,,,stop
+2026-06-21T14:58:56.1784908Z,table_test.pdf,pdf,27924,qwen3.5:9b,3154,355,15870,7117,stop
+2026-06-21T15:01:04.3172070Z,table_test.docx,docx,9211,qwen3.5:9b,3217,333,7726,6700,stop
+2026-06-21T15:02:20.7706004Z,table_test.docx,docx,9211,gliner,,,,,stop
+2026-06-21T15:02:49.9146461Z,table_test.pdf,pdf,27924,gliner,,,,,stop
+2026-06-21T15:38:25.1683192Z,table_test.pdf,pdf,27924,qwen3.5:9b,3154,355,15642,7132,stop
