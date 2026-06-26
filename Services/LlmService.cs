@@ -13,14 +13,15 @@ namespace ArabicPdfReader.Services
         {
             this.logger = logger;
             this.configuration = configuration;
-
             promptTemplate = File.ReadAllText("Prompts/extraction_prompt.txt", System.Text.Encoding.UTF8);
         }
 
-        public async Task<string> ExtractData(string extractedText, string fileType, long fileSize, string fileName, string model)
+        public async Task<(Guid extraction_id, string resultText, long? PromptEvalCount, long? EvalCount, long? TotalDuration, long? EvalDuration, string? DoneReason)> 
+        ExtractData(string extractedText, string model)
         {
             try
             {
+                Guid extraction_id = Guid.NewGuid();
                 string renderedPrompt = promptTemplate.Replace("{{extractedText}}", extractedText);
 
                 var ollamaHost = configuration["OLLAMA_HOST"] ?? "http://localhost:11434";
@@ -30,15 +31,8 @@ namespace ArabicPdfReader.Services
                 {
                     Messages = new[]
                     {
-                        new Message { 
-                            Role = ChatRole.System, 
-                            Content = "You are a structured data extraction engine for Arabic documents. Return only raw JSON."  
-                        },
-                        new Message
-                        {
-                            Role = ChatRole.User,
-                            Content = renderedPrompt
-                        }
+                        new Message { Role = ChatRole.System, Content = "You are a structured data extraction engine for Arabic documents. Return only raw JSON." },
+                        new Message { Role = ChatRole.User, Content = renderedPrompt }
                     },
                     Think = false,
                     Stream = false,
@@ -52,48 +46,30 @@ namespace ArabicPdfReader.Services
                 {
                     if (chunk?.Message?.Content is { Length: > 0 } content)
                         resultText += content;
-                    
                     if (chunk is ChatDoneResponseStream done) 
                         lastChunk = done;
                 }
 
-                var csvLine = string.Join(
-                    ",",
-                    DateTime.UtcNow.ToString("o"), // ISO 8601 foramt
-                    fileName,
-                    fileType,
-                    fileSize,
-                    model,
+                return (extraction_id, resultText,
                     lastChunk?.PromptEvalCount,
                     lastChunk?.EvalCount,
                     lastChunk?.TotalDuration / 1_000_000,
                     lastChunk?.EvalDuration / 1_000_000,
-                    lastChunk?.DoneReason
-                );
-
-                var csvPath = configuration["CsvLogPath"] ?? "../logs/extraction_log.csv";
-                Directory.CreateDirectory(Path.GetDirectoryName(csvPath)!);
-
-                if (!File.Exists(csvPath))
-                     await File.AppendAllTextAsync(csvPath, "timestamp,file_name,file_type,file_size_bytes,model,prompt_tokens,completion_tokens,total_duration_ms,eval_duration_ms,done_reason\n");
-
-                await File.AppendAllTextAsync(csvPath, csvLine + "\n");
-                return resultText;
-
+                    lastChunk?.DoneReason);
             }
             catch (TaskCanceledException ex)
             {
-                logger.LogError(ex, "Ollama request timed out. The model may be overloaded or unreachable.");
+                logger.LogError(ex, "Ollama request timed out.");
                 throw new TimeoutException("Ollama did not respond in time.", ex);
             }
             catch (HttpRequestException ex)
             {
-                logger.LogError(ex, "Failed to reach Ollama. Verify the host is running and OLLAMA_HOST is correctly configured.");
+                logger.LogError(ex, "Failed to reach Ollama.");
                 throw;
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Unexpected error during LLM extraction. File bytes length: {Length}.", fileSize);
+                logger.LogError(ex, "Unexpected error during LLM extraction.");
                 throw new InvalidOperationException("Unexpected error during extraction.", ex);
             }
         }

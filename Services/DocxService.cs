@@ -22,9 +22,7 @@ namespace ArabicPdfReader.Services
                 using (WordprocessingDocument wordDoc = WordprocessingDocument.Open(stream, false))
                 {
                     if (wordDoc.MainDocumentPart == null) return string.Empty;
-
                     var body = wordDoc.MainDocumentPart?.Document?.Body;
-
                     if (body == null) return string.Empty;
 
                     foreach (var element in body.Elements())
@@ -32,12 +30,7 @@ namespace ArabicPdfReader.Services
                         if (element is Paragraph paragraph)
                         {
                             string text = paragraph.InnerText;
-
-                            // DOCX stores Arabic in correct logical order already —
-                            // no BidiReshape needed. NFKC kept as a safety net for
-                            // any stray presentation-form characters.
                             text = text.Normalize(NormalizationForm.FormKC);
-
                             stringBuilder.AppendLine(text);
                         }
 
@@ -46,27 +39,22 @@ namespace ArabicPdfReader.Services
                             var rows = table.Elements<TableRow>().ToList();
                             if (rows.Count == 0) continue;
 
-                            // The first row will contain the column headers
                             var headerCells = rows[0].Elements<TableCell>()
                                 .Select(cell => cell.InnerText.Normalize(NormalizationForm.FormKC))
                                 .ToList();
 
-                            // Each cell, in the remaining rows, will pair with its column header as "header: value"
                             foreach (var row in rows.Skip(1))
                             {
                                 var cells = row.Elements<TableCell>().ToList();
-
                                 var lines = cells.Select((cell, index) =>
                                 {
                                     string text = cell.InnerText.Normalize(NormalizationForm.FormKC);
                                     string header = headerCells[index];
-
                                     return $"{header}: {text}";
                                 });
 
-                                // One key: value pair per line — mirrors the format that worked in manual GLiNER testing.
                                 stringBuilder.AppendLine(string.Join('\n', lines));
-                                stringBuilder.AppendLine(); // blank line between rows/records
+                                stringBuilder.AppendLine();
                             }
                         }
                     }

@@ -1,5 +1,6 @@
 ﻿using ArabicPdfReader.Middleware;
 using ArabicPdfReader.Services;
+using ArabicPdfReader.Utilities;
 
 class Program
 {
@@ -11,6 +12,7 @@ class Program
         builder.Services.AddSingleton<GlinerService>();
         builder.Services.AddSingleton<PdfService>();
         builder.Services.AddSingleton<DocxService>();
+        builder.Services.AddSingleton<PerformanceMonitor>();
         builder.Services.AddControllers();
 
         var app = builder.Build();

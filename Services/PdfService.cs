@@ -12,6 +12,7 @@ namespace ArabicPdfReader.Services
         {
             this.logger = logger;
         }
+
         public string ExtractText(Stream stream)
         {
             var stringBuilder = new StringBuilder();
@@ -22,16 +23,12 @@ namespace ArabicPdfReader.Services
                 {
                     foreach (Page page in document.GetPages())
                     {
-                        // This can be used for non table documents -- deprecated use in this source code
-                        // string text = ContentOrderTextExtractor.GetText(page);
-
                         var words = page.GetWords().OrderByDescending(word => word.BoundingBox.Bottom).ToList();
 
-                        if (words.Count == 0) continue; // Skip empty pages
-
+                        if (words.Count == 0) continue;
 
                         double averageTextHeight = words.Average(word => word.BoundingBox.Height);
-                        double tolerance = averageTextHeight * 0.3; // 30% of average word height
+                        double tolerance = averageTextHeight * 0.3;
 
                         var rows = new List<List<Word>>();
                         List<Word>? currentRow = null;
@@ -56,7 +53,8 @@ namespace ArabicPdfReader.Services
                             try
                             {
                                 processedLine = BidiReshape.ProcessString(line);    
-                            } catch
+                            }
+                            catch
                             {
                                 processedLine = line;    
                             }
