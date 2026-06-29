@@ -52,9 +52,9 @@ namespace ArabicPdfReader.Controllers
             byte[] fileBytes = memoryStream.ToArray();
 
             string extractedText = ExtractText(fileBytes, fileType);
-            
+
             logger.LogInformation("Extracted text for {FileName}:\n{ExtractedText}", file.FileName, extractedText);
-            
+
             var stopwatch = Stopwatch.StartNew();
 
             Guid extraction_id = Guid.Empty;
@@ -67,9 +67,10 @@ namespace ArabicPdfReader.Controllers
             {
                 if (model == "gliner")
                 {
-                    Console.WriteLine(extractedText);
                     (extraction_id, modelResponse) = await glinerService.ExtractData(extractedText);
-                } else {
+                }
+                else
+                {
                     (extraction_id, modelResponse, promptTokens, completionTokens, totalDurationMs, evalDurationMs, doneReason) = await llmService.ExtractData(extractedText, model);
                 }
             }
@@ -111,14 +112,14 @@ namespace ArabicPdfReader.Controllers
             var csvPath = configuration["CsvExtractionLogPath"] ?? "/app/logs/extraction_log.csv";
             Directory.CreateDirectory(Path.GetDirectoryName(csvPath)!);
 
-            if (!System.IO.File.Exists(csvPath)) 
+            if (!System.IO.File.Exists(csvPath))
                 await System.IO.File.AppendAllTextAsync(csvPath, "extraction_id,timestamp,file_name,file_type,file_size_bytes,model,prompt_tokens,completion_tokens,total_duration_ms,eval_duration_ms,done_reason\n");
 
             await System.IO.File.AppendAllTextAsync(csvPath, csvLine + "\n");
 
             await performanceMonitor.UpdateAfterExtractionAsync(stopwatch.ElapsedMilliseconds);
 
-            return Ok(new 
+            return Ok(new
             {
                 extractionId = extraction_id,
                 result = modelResponse
@@ -141,18 +142,19 @@ namespace ArabicPdfReader.Controllers
                 Directory.CreateDirectory(Path.GetDirectoryName(csvPath)!);
 
                 if (!System.IO.File.Exists(csvPath))
-                     await System.IO.File.AppendAllTextAsync(csvPath, "extraction_id,timestamp,feedback\n");
+                    await System.IO.File.AppendAllTextAsync(csvPath, "extraction_id,timestamp,feedback\n");
 
                 await System.IO.File.AppendAllTextAsync(csvPath, csvLine + "\n");
 
                 await performanceMonitor.UpdateAfterFeedbackAsync(feedback);
-            } catch (Exception ex)
+            }
+            catch (Exception ex)
             {
                 logger.LogError(ex, "Failed to write feedback to CSV. ExtractionId: {ExtractionId}", extraction_id);
                 return StatusCode(500, "Failed to save feedback.");
             }
-            
-            return Ok("Feedback received. Thank you!");    
+
+            return Ok("Feedback received. Thank you!");
         }
 
         [HttpGet("report")]
