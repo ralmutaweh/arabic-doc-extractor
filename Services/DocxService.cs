@@ -1,5 +1,4 @@
 using System.Text;
-using BidiReshapeSharp;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 
@@ -23,30 +22,41 @@ namespace ArabicPdfReader.Services
                 using (WordprocessingDocument wordDoc = WordprocessingDocument.Open(stream, false))
                 {
                     if (wordDoc.MainDocumentPart == null) return string.Empty;
-
                     var body = wordDoc.MainDocumentPart?.Document?.Body;
-
                     if (body == null) return string.Empty;
 
-                    foreach (Paragraph paragraph in body.Elements<Paragraph>())
+                    foreach (var element in body.Elements())
                     {
-                        string text = paragraph.InnerText;
-
-                        var lines = text.Split('\n');
-                        var processedLines = lines.Select(line =>
+                        if (element is Paragraph paragraph)
                         {
-                            try
-                            {
-                                return BidiReshape.ProcessString(line);
-                            }
-                            catch
-                            {
-                                return line;
-                            }
-                        });
+                            string text = paragraph.InnerText;
+                            text = text.Normalize(NormalizationForm.FormKC);
+                            stringBuilder.AppendLine(text);
+                        }
 
-                        text = string.Join('\n', processedLines);
-                        stringBuilder.AppendLine(text);
+                        if (element is Table table)
+                        {
+                            var rows = table.Elements<TableRow>().ToList();
+                            if (rows.Count == 0) continue;
+
+                            var headerCells = rows[0].Elements<TableCell>()
+                                .Select(cell => cell.InnerText.Normalize(NormalizationForm.FormKC))
+                                .ToList();
+
+                            foreach (var row in rows.Skip(1))
+                            {
+                                var cells = row.Elements<TableCell>().ToList();
+                                var lines = cells.Select((cell, index) =>
+                                {
+                                    string text = cell.InnerText.Normalize(NormalizationForm.FormKC);
+                                    string header = headerCells[index];
+                                    return $"{header}: {text}";
+                                });
+
+                                stringBuilder.AppendLine(string.Join('\n', lines));
+                                stringBuilder.AppendLine();
+                            }
+                        }
                     }
                 }
             }

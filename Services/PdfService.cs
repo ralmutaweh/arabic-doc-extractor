@@ -2,7 +2,6 @@ using System.Text;
 using BidiReshapeSharp;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
-using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
 
 namespace ArabicPdfReader.Services
 {
@@ -13,6 +12,7 @@ namespace ArabicPdfReader.Services
         {
             this.logger = logger;
         }
+
         public string ExtractText(Stream stream)
         {
             var stringBuilder = new StringBuilder();
@@ -23,25 +23,45 @@ namespace ArabicPdfReader.Services
                 {
                     foreach (Page page in document.GetPages())
                     {
-                        string text = ContentOrderTextExtractor.GetText(page);
+                        var words = page.GetWords().OrderByDescending(word => word.BoundingBox.Bottom).ToList();
 
-                        // Reshape the text to correct the order of Arabic characters
-                        var lines = text.Split('\n');
-                        var processedLines = lines.Select(line =>
+                        if (words.Count == 0) continue;
+
+                        double averageTextHeight = words.Average(word => word.BoundingBox.Height);
+                        double tolerance = averageTextHeight * 0.3;
+
+                        var rows = new List<List<Word>>();
+                        List<Word>? currentRow = null;
+                        double? currentRowY = null;
+
+                        foreach (var word in words)
                         {
+                            if (currentRow == null || Math.Abs(word.BoundingBox.Bottom - currentRowY!.Value) > tolerance)
+                            {
+                                currentRow = new List<Word>();
+                                rows.Add(currentRow);
+                                currentRowY = word.BoundingBox.Bottom;
+                            }
+                            currentRow.Add(word);
+                        }
+
+                        foreach (var row in rows)
+                        {
+                            var orderedWords = row.OrderByDescending(word => word.BoundingBox.Left);
+                            string line = string.Join(" ", orderedWords.Select(word => word.Text));
+                            string processedLine;
                             try
                             {
-                                return BidiReshape.ProcessString(line);
+                                processedLine = BidiReshape.ProcessString(line);    
                             }
                             catch
                             {
-                                // If reshaping fails, return the original line
-                                return line;
+                                processedLine = line;    
                             }
-                        });
-                        text = string.Join('\n', processedLines);
-
-                        stringBuilder.AppendLine(text);
+                            
+                            processedLine = processedLine.Normalize(NormalizationForm.FormKC);
+                            stringBuilder.AppendLine(processedLine);
+                        }
                     }
                 }
             }
