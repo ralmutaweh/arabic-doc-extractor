@@ -7,7 +7,9 @@ services:
     environment:
       - OLLAMA_HOST=http://192.168.100.194:11434  # Ollama instance address, change this if host changes
       - GLINER_HOST=http://gliner-service:8001
-      - CsvLogPath=/app/logs/extraction_log.csv
+      - CsvExtractionLogPath=/app/logs/extraction_log.csv
+      - CsvComparisonLogPath=/app/logs/feedback_log.csv
+      - ComparisonFeatureEnabled=true
     restart: unless-stopped    # restart container automatically if it crashes
     volumes:
       - ./logs:/app/logs

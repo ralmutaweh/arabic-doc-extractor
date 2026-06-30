@@ -1,3 +1,4 @@
+using ArabicPdfReader.Models;
 using ArabicPdfReader.Services;
 using ArabicPdfReader.Utilities;
 using Microsoft.AspNetCore.Mvc;
@@ -126,37 +127,64 @@ namespace ArabicPdfReader.Controllers
             });
         }
 
-        [HttpPost("feedback")]
-        public async Task<IActionResult> Feedback(Guid extraction_id, string feedback)
+        [HttpPost("compare")]
+        // [FromBody] is used to read the body of the HTTP request and convert it into a C# object
+        public async Task<IActionResult> Compare([FromBody] ExtractionVerification request)
         {
+            bool isComparisonEnabled = configuration.GetValue<bool>("ComparisonFeatureEnabled", true);
+
+            if (!isComparisonEnabled)
+            {
+                return Ok(); // Not needed to do any work or return a failing message
+            }
+            bool namesMatch = ListsMatch(request.ExtractedNames, request.UserFinalUploadedNames);
+            bool entitiesMatch = ListsMatch(request.ExtractedEntities, request.UserFinalUploadedEntities);
+            bool countriesMatch = ListsMatch(request.ExtractedCountries, request.UserFinalUploadedCountries);
+
+            int changedCount = 0;
+            if (!namesMatch) changedCount++;
+            if (!entitiesMatch) changedCount++;
+            if (!countriesMatch) changedCount++;
+
+            bool fullMatch = changedCount == 0;
+
             try
             {
                 var csvLine = string.Join(
                     ",",
-                    extraction_id,
+                    request.ExtractionId,
                     DateTime.UtcNow.ToString("o"),
-                    $"\"{feedback}\""
+                    namesMatch,
+                    entitiesMatch,
+                    countriesMatch,
+                    $"{3 - changedCount}/3"
                 );
 
-                var csvPath = configuration["CsvFeedbackLogPath"] ?? "/app/logs/feedback_log.csv";
+                var csvPath = configuration["CsvComparisonLogPath"] ?? "/app/logs/feedback_log.csv";
                 Directory.CreateDirectory(Path.GetDirectoryName(csvPath)!);
 
                 if (!System.IO.File.Exists(csvPath))
-                    await System.IO.File.AppendAllTextAsync(csvPath, "extraction_id,timestamp,feedback\n");
+                    await System.IO.File.AppendAllTextAsync(csvPath, "extraction_id,timestamp,names_match,entities_match,countries_match,overall_score\n");
 
                 await System.IO.File.AppendAllTextAsync(csvPath, csvLine + "\n");
 
-                await performanceMonitor.UpdateAfterFeedbackAsync(feedback);
+                await performanceMonitor.UpdateAfterComparisonAsync(fullMatch, changedCount);
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to write feedback to CSV. ExtractionId: {ExtractionId}", extraction_id);
-                return StatusCode(500, "Failed to save feedback.");
+                logger.LogError(ex, "Failed to write comparison to CSV. ExtractionId: {ExtractionId}", request.ExtractionId);
+                return StatusCode(500, "Failed to save comparison.");
             }
 
-            return Ok("Feedback received. Thank you!");
+            return Ok(new
+            {
+                extractionId = request.ExtractionId,
+                namesMatch,
+                entitiesMatch,
+                countriesMatch,
+                score = $"{3 - changedCount}/3"
+            });
         }
-
         [HttpGet("report")]
         public async Task<IActionResult> Report()
         {
@@ -187,6 +215,12 @@ namespace ArabicPdfReader.Controllers
             return fileType == "pdf" ?
             pdfService.ExtractText(memoryStream) :
             docxService.ExtractText(memoryStream);
+        }
+          private bool ListsMatch(List<string> extracted, List<string> finalConfirmedFields)
+        {
+            // A hash set is choosen to automatically drop duplicate values
+            var extractedSet = new HashSet<string>(extracted, StringComparer.OrdinalIgnoreCase);
+            return extractedSet.SetEquals(finalConfirmedFields);
         }
     }
 }

@@ -53,14 +53,15 @@ namespace ArabicPdfReader.Utilities
            await WriteSummaryAsync(summary);
         }
 
-        public async Task UpdateAfterFeedbackAsync(string feedback)
+        public async Task UpdateAfterComparisonAsync(bool fullMatch, int changedCount)
         {
             var summary = await ReadSummaryAsync();
 
-            summary.TotalFeedbackReceived++;
+            summary.TotalComparisons++;
 
-            if (feedback == "correct")
-                summary.FeedbackCorrect++;
+            if (fullMatch) summary.FullMatchCount++;
+
+            summary.TotalFieldsChanged += changedCount;
 
             summary.LastUpdated = DateTime.UtcNow.ToString();
 
@@ -71,15 +72,15 @@ namespace ArabicPdfReader.Utilities
         {
             var summary = await ReadSummaryAsync();
 
-            var feedbackRatio = summary.TotalFeedbackReceived > 0
-                ? (double)summary.FeedbackCorrect / summary.TotalFeedbackReceived * 100 : 0;
+            var fullMatchRatio = summary.TotalComparisons > 0
+                ? (double)summary.FullMatchCount / summary.TotalComparisons * 100 : 0;
             
             logger.LogInformation("=== PERFORMANCE REPORT ===");
             logger.LogInformation("Total Extractions: {Total}", summary.TotalExtractions);
             logger.LogInformation("Extractions Today: {Today}", summary.ExtractionsToday);
             logger.LogInformation("Average Latency: {Latency}ms", summary.AverageLatencyMs);
-            logger.LogInformation("Total Feedback Received: {Feedback}", summary.TotalFeedbackReceived);
-            logger.LogInformation("Feedback Correct: {Correct} ({Ratio:F1}%)", summary.FeedbackCorrect, feedbackRatio);
+            logger.LogInformation("Total Comparisons: {Comparisons}", summary.TotalComparisons);
+            logger.LogInformation("Full Match: {FullMatch} ({Ratio:F1}%)", summary.FullMatchCount, fullMatchRatio);
             logger.LogInformation("Last Updated: {LastUpdated}", summary.LastUpdated);
             logger.LogInformation("==========================");
         }
@@ -88,8 +89,9 @@ namespace ArabicPdfReader.Utilities
     public class PerformanceSummary
     {
         public int TotalExtractions { get; set; }
-        public int TotalFeedbackReceived { get; set; }
-        public int FeedbackCorrect { get; set; }
+        public int TotalComparisons { get; set; } // This will be useful when the comparison is toggled off
+        public int FullMatchCount { get; set;}
+        public int TotalFieldsChanged {get; set; } // Not a final full match 
         public long AverageLatencyMs { get; set; }
         public int ExtractionsToday { get; set; }
         public string LastUpdated { get; set; } = "No logs yet — will update on first extraction.";
