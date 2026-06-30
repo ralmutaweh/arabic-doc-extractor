@@ -18,6 +18,7 @@ class Program
         var app = builder.Build();
 
         app.UseMiddleware<RequestLoggingMiddleware>();
+        app.UseStaticFiles(); // Allows ASP.NET to servie files from wwwroot/ automatically
         app.MapGet("/", () => "Arabic Doc Extractor API is running!");
         app.MapControllers();
 

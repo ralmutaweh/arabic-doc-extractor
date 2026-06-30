@@ -9,4 +9,8 @@ __MACOSX/
 # User-specific files
 *.user
 .vs/
+logs/
+~$*
 
+# model
+gliner-cache/
