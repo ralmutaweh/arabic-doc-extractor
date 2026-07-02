@@ -3,6 +3,7 @@ using ArabicPdfReader.Services;
 using ArabicPdfReader.Utilities;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
+using System.Text.Encodings.Web;
 
 namespace ArabicPdfReader.Controllers
 {
@@ -32,7 +33,7 @@ namespace ArabicPdfReader.Controllers
         }
 
         [HttpPost("upload")]
-        public async Task<IActionResult> Upload(IFormFile file, string model = "qwen3.5:9b")
+        public async Task<IActionResult> Upload(IFormFile file, string model = "gliner")
         {
             if (file == null) return BadRequest("File is null");
 
@@ -42,8 +43,8 @@ namespace ArabicPdfReader.Controllers
             using Stream stream = file.OpenReadStream();
             string fileType = DetectFileType(stream);
 
-            if (fileType == "unknown")
-                return BadRequest("Unsupported file type. Only PDF and DOCX are accepted.");
+            if (fileType == "pdf" || fileType == "unknown")
+                return BadRequest("Unsupported file type. Only DOCX are accepted.");
 
             logger.LogInformation("Extraction request received. File: {FileName}, Size: {Size} bytes, Type: {Type}",
                 file.FileName, file.Length, fileType);
@@ -102,6 +103,7 @@ namespace ArabicPdfReader.Controllers
                 file.FileName,
                 fileType,
                 fileBytes.Length,
+                stopwatch.ElapsedMilliseconds,
                 model,
                 model == "gliner" ? null : promptTokens,
                 model == "gliner" ? null : completionTokens,
@@ -114,7 +116,7 @@ namespace ArabicPdfReader.Controllers
             Directory.CreateDirectory(Path.GetDirectoryName(csvPath)!);
 
             if (!System.IO.File.Exists(csvPath))
-                await System.IO.File.AppendAllTextAsync(csvPath, "extraction_id,timestamp,file_name,file_type,file_size_bytes,model,prompt_tokens,completion_tokens,total_duration_ms,eval_duration_ms,done_reason\n");
+                await System.IO.File.AppendAllTextAsync(csvPath, "extraction_id,timestamp,file_name,file_type,file_size_bytes,latency_ms,model,prompt_tokens,completion_tokens,total_duration_ms,eval_duration_ms,done_reason\n");
 
             await System.IO.File.AppendAllTextAsync(csvPath, csvLine + "\n");
 
@@ -157,14 +159,20 @@ namespace ArabicPdfReader.Controllers
                     namesMatch,
                     entitiesMatch,
                     countriesMatch,
-                    $"{3 - changedCount}/3"
+                    $"{3 - changedCount}/3",
+                    ToCsvCell(request.ExtractedNames),
+                    ToCsvCell(request.UserFinalUploadedNames),
+                    ToCsvCell(request.ExtractedEntities),
+                    ToCsvCell(request.UserFinalUploadedEntities),
+                    ToCsvCell(request.ExtractedCountries),
+                    ToCsvCell(request.UserFinalUploadedCountries)
                 );
 
                 var csvPath = configuration["CsvComparisonLogPath"] ?? "/app/logs/feedback_log.csv";
                 Directory.CreateDirectory(Path.GetDirectoryName(csvPath)!);
 
                 if (!System.IO.File.Exists(csvPath))
-                    await System.IO.File.AppendAllTextAsync(csvPath, "extraction_id,timestamp,names_match,entities_match,countries_match,overall_score\n");
+                    await System.IO.File.AppendAllTextAsync(csvPath, "extraction_id,timestamp,names_match,entities_match,countries_match,overall_score,extracted_names,actual_names,extracted_entities,actual_entities,extracted_countries,actual_countries\n");
 
                 await System.IO.File.AppendAllTextAsync(csvPath, csvLine + "\n");
 
@@ -184,12 +192,6 @@ namespace ArabicPdfReader.Controllers
                 countriesMatch,
                 score = $"{3 - changedCount}/3"
             });
-        }
-        [HttpGet("report")]
-        public async Task<IActionResult> Report()
-        {
-            await performanceMonitor.GenerateReport();
-            return Ok("Report Generated. Check Docker Service logs.");
         }
 
         private string DetectFileType(Stream stream)
@@ -221,6 +223,21 @@ namespace ArabicPdfReader.Controllers
             // A hash set is choosen to automatically drop duplicate values
             var extractedSet = new HashSet<string>(extracted, StringComparer.OrdinalIgnoreCase);
             return extractedSet.SetEquals(finalConfirmedFields);
+        }
+
+        // The values come through as for example ["Ahmed Ali", "Sara Hassan"]
+        // The CSV parser considers the "," as a column separator. This breaks the split operation.
+        // So this replaces every ' " ' with ' "" '. So it becomes like this "[""Ahmed Ali"",""Sara Hassan""]"
+        // Then the CSV parsers considers the whole thing as a single object and ignores the comma and splits after the last ' " '
+        private string ToCsvCell(List<string> values)
+        {
+            // UnsafeRelaxedJsonEscaping tells the serializer to write Arabic characters as-is instead of \uXXXX escape sequences
+            var options = new System.Text.Json.JsonSerializerOptions
+            {
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping 
+            };
+            var json = System.Text.Json.JsonSerializer.Serialize(values, options);
+            return $"\"{json.Replace("\"", "\"\"")}\"";
         }
     }
 }

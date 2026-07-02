@@ -44,12 +44,13 @@ namespace ArabicPdfReader.Controllers
                     FileName = fields[2],
                     FileType = fields[3],
                     FileSizeBytes = long.Parse(fields[4]),
-                    Model = fields[5],
-                    PromptTokens = fields[6],
-                    CompletionTokens = fields[7],
-                    TotalDurationMs = fields[8],
-                    EvalDurationMs = fields[9],
-                    DoneReason = fields[10],
+                    LatencyMs = long.Parse(fields[5]),
+                    Model = fields[6],
+                    PromptTokens = fields[7],
+                    CompletionTokens = fields[8],
+                    TotalDurationMs = fields[9],
+                    EvalDurationMs = fields[10],
+                    DoneReason = fields[11],
                 };
 
                 entries.Add(entry);
@@ -83,6 +84,22 @@ namespace ArabicPdfReader.Controllers
 
                 entries.Add(entry);
             }
+
+            return Ok(entries);
+        }
+
+        [HttpGet("latency-trend")]
+        public async Task<IActionResult> LatencyTrend()
+        {
+            var csvPath = configuration["CsvExtractionLogPath"] ?? "/app/logs/extraction_log.csv";
+            var lines = await CsvTailReader.ReadLastLinesAsync(csvPath, 200);
+
+            var entries = lines.Select(line => {
+                var f = line.Split(',');
+                return new { Timestamp = f[1], LatencyMs = long.Parse(f[5]) };
+            }).ToList();
+
+            entries.Reverse();
 
             return Ok(entries);
         }

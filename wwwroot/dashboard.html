@@ -1,6 +1,66 @@
 <!doctype html>
-<html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8"> <!-- Ensures browers correctly interpret and display characters correctly -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Adapting to the screen size of the device being used automatically -->
+
+    <title>Dashboard</title>
+
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+    <link rel="stylesheet" href="/dashboard.css">
+  </head>
+
   <body>
-    <h1>Dashboard</h1>
+<header>
+  <div class="brand">
+    <div class="brand-dot"></div>
+    <div>
+      <div class="brand-name">Arabic Extraction Service</div>
+      <div class="brand-sub">Health dashboard</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="refresh-time">last refresh: <span id="lastRefresh">—</span></span>
+    <button class="btn" onclick="refreshAll()">↻ Refresh</button>
+  </div>
+</header>
+
+<main>
+  <!-- Metric cards -->
+    <div class="metrics" id="metricsRow">
+    <div class="metric-card"><div class="metric-label">Total Extractions</div><div class="metric-value" id="m-total">—</div></div>
+    <div class="metric-card"><div class="metric-label">Extractions Today</div><div class="metric-value blue" id="m-today">—</div></div>
+    <div class="metric-card"><div class="metric-label">Avg Latency</div><div class="metric-value" id="m-latency">—</div></div>
+    <div class="metric-card"><div class="metric-label">Total Comparisons</div><div class="metric-value" id="m-comparisons">—</div></div>
+    <div class="metric-card"><div class="metric-label">Full Match Rate</div><div class="metric-value green" id="m-matchrate">—</div></div>
+    <div class="metric-card"><div class="metric-label">Fields Changed</div><div class="metric-value yellow" id="m-changed">—</div></div>
+  </div>
+
+  <!-- Latency chart -->
+    <div class="left-panel">
+    <div class="section-header">
+      <span class="section-title">Latency Trend</span>
+      <span class="section-badge" id="chartBadge">last 30 extractions</span>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="latencyChart"></canvas>
+    </div>
+  </div>
+
+   <!-- Extraction logs -->
+    <div class="right-panel">
+    <div class="right-header">
+      <div class="section-header">
+        <span class="section-title">Recent Extractions</span>
+        <span class="section-badge" id="logCount">0 entries</span>
+      </div>
+    </div>
+    <div class="log-list" id="logList">
+      <div class="empty-state"><div class="empty-icon">○</div>No extractions yet.</div>
+    </div>
+  </div>
+</main>
+<script src="/dashboard.js"></script>
   </body>
 </html>
+

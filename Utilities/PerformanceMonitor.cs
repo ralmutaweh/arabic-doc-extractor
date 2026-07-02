@@ -67,23 +67,6 @@ namespace ArabicPdfReader.Utilities
 
             await WriteSummaryAsync(summary);
         }
-
-        public async Task GenerateReport()
-        {
-            var summary = await ReadSummaryAsync();
-
-            var fullMatchRatio = summary.TotalComparisons > 0
-                ? (double)summary.FullMatchCount / summary.TotalComparisons * 100 : 0;
-            
-            logger.LogInformation("=== PERFORMANCE REPORT ===");
-            logger.LogInformation("Total Extractions: {Total}", summary.TotalExtractions);
-            logger.LogInformation("Extractions Today: {Today}", summary.ExtractionsToday);
-            logger.LogInformation("Average Latency: {Latency}ms", summary.AverageLatencyMs);
-            logger.LogInformation("Total Comparisons: {Comparisons}", summary.TotalComparisons);
-            logger.LogInformation("Full Match: {FullMatch} ({Ratio:F1}%)", summary.FullMatchCount, fullMatchRatio);
-            logger.LogInformation("Last Updated: {LastUpdated}", summary.LastUpdated);
-            logger.LogInformation("==========================");
-        }
     }
 
     public class PerformanceSummary

@@ -7,6 +7,7 @@ namespace ArabicPdfReader.Models
         public string FileName { get; set; } = string.Empty;
         public string FileType { get; set; } = string.Empty;
         public long FileSizeBytes { get; set; }
+        public long LatencyMs { get; set; }
         public string Model { get; set; } = string.Empty;
         public string? PromptTokens { get; set; }
         public string? CompletionTokens { get; set; }

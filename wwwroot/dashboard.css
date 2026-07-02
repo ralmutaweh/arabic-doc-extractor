@@ -1,0 +1,274 @@
+/* Targeting all elements and pseudo-elements to inherit the same box-sizing and reset
+This ensures consistency on differnt browsers
+*/
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0;}
+
+:root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #21262d;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --accent: #2f81f7;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d29922;
+    --font: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh; /* vh stand for Viewport Height */
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+
+}
+
+/* Top Bar */
+header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.brand-dot {
+    width: 8px; height: 8px; /* Generate the tiny circle */
+    border-radius: 50%; /* Turns the square into a circle */
+    background-color: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse { /* Allows to create animations by defining the intermediate steps (keyframes) */
+    0%, 100% { opacity: 1; } /* At the start and end the opacity should be 1 */
+    50% { opacity: 0.4 ;}
+}
+
+.brand-name { 
+    font-size: 14px; 
+    font-weight: 600; 
+    letter-spacing: 0.01em; /* A relative unit that scales based on the font size of its nearest parent element */
+} 
+
+.brand-sub {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--font);
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.refresh-time {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--font);
+}
+
+.btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+
+.btn:hover {
+    background: #1c2128;
+    border-color: #444c56;
+}
+
+/* Main Layout */
+main {
+    display: grid;
+    grid-template-columns: 1fr 380px; /* Fractional unit to represent the portion of available space in the grid container */
+    grid-template-rows: auto  1fr;
+    gap: 0;
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+}
+
+/* Metric cards */
+.metrics {
+    grid-column: 1 / -1; /* Take up the full width of the grid, 1 is the first grid in the column and -1 for the last line */
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-bottom: 1px solid var(--border);
+}
+
+.metric-card {
+    background: var(--surface);
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.metric-label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.0em;
+    font-family: var(--font);
+}
+
+.metric-value {
+    font-size: 28px;
+    font-weight: 700;
+    font-family: var(--font);
+    letter-spacing: -0.02em;
+    line-height: 1;
+}
+
+.metric-value.green { color: var(--green); }
+.metric-value.blue { color: var(--accent); }
+.metric-value.yellow { color: var(--yellow); }
+.metric-value.red { color: var(--red); }
+
+/* Chart section */
+.left-panel {
+    grid-column: 1;
+    grid-row: 2 / 4;
+    border-right: 1px solid var(--border);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow: hidden;
+    max-height: 600px;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-family: var(--font);
+}
+
+.section-badge {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--font);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+/* Chart */
+.chart-wrap {
+    flex: 1;
+    position: relative;
+    min-height: 200px;
+}
+
+canvas {width: 100% !important}
+
+/* Right panel */
+.right-panel {
+    grid-column: 2;
+    grid-row: 2 / 4;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.log-list {
+    flex: 1;
+    overflow-y: auto; /* To manage the vertical overflow */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+
+.log-item {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: background 0.1s; 
+}
+
+.log-item:hover {
+    background: rgba(47,129, 247,0.04);
+}
+
+.log-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.log-latency {
+    font-family: var(--font);
+    font-size: 12px;
+    color: var(--accent);
+    white-space: nowrap;
+}
+
+.log-meta {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--font);
+}
+
+
+/* This is to differentiate between pdf or docx document, can be used when the main system will use pdf 
+.log-type-badge {
+    font-size: 10px;
+    font-family: var(--font);
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    text-transform: uppercase;
+} */
+
+.empty-state {
+    padding: 32px 20px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    font-family: var(--font);
+}
+
+.empty-state .empty-icon {
+    font-size: 24px; margin-bottom: 8px; opacity: 0.4;
+}
+
+/* Right panel header */
+.right-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+}
